@@ -1,0 +1,183 @@
+# -Smart-soil-irrigation-sensor-
+This code tells us about saving of water and ts for agriculture purpose and it'll be useful for farmers
+from flask import Flask, jsonify, render_template_string
+import time
+
+app = Flask(__name__)
+
+# -------- SERIAL SETUP --------
+try:
+    import serial
+    ser = serial.Serial('COM3', 9600, timeout=1)  # 🔥 CHANGE PORT
+    time.sleep(2)
+    SERIAL_AVAILABLE = True
+except:
+    print("⚠️ Serial not connected. Running in dummy mode.")
+    SERIAL_AVAILABLE = False
+
+# -------- GLOBAL DATA --------
+data = {
+    "crop": "Unknown",
+    "moisture": 0,
+    "pump": "OFF"
+}
+
+crop_names = {
+    "1": "🌾 Paddy",
+    "2": "🌿 Cotton",
+    "3": "🌵 Cactus",
+    "4": "🌱 Aloe Vera"
+}
+
+# -------- READ SERIAL --------
+def read_serial():
+    global data
+
+    if SERIAL_AVAILABLE and ser.in_waiting:
+        try:
+            line = ser.readline().decode().strip()
+            print("RAW:", line)
+
+            parts = line.split(",")
+
+            for part in parts:
+                key, value = part.split(":")
+
+                if key == "crop":
+                    data["crop"] = crop_names.get(value, "Unknown")
+
+                elif key == "moisture":
+                    data["moisture"] = int(value)
+
+                elif key == "pump":
+                    data["pump"] = value
+
+        except:
+            pass
+    else:
+        # Dummy mode (for testing without Arduino)
+        import random
+        data["moisture"] = random.randint(300, 800)
+        data["pump"] = "ON" if data["moisture"] > 600 else "OFF"
+        data["crop"] = "🌾 Paddy"
+
+
+# -------- FRONTEND --------
+HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Irrigation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI';
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: white;
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 20px;
+            font-size: 2.5rem;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            margin: 15px;
+            border-radius: 15px;
+            width: 250px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            transition: 0.3s;
+        }
+
+        .card:hover {
+            transform: scale(1.05);
+        }
+
+        .value {
+            font-size: 2rem;
+            margin-top: 10px;
+        }
+
+        .on { color: #00ff9f; }
+        .off { color: #ff4d4d; }
+
+    </style>
+</head>
+
+<body>
+
+<h1>🌾 Smart Irrigation Dashboard</h1>
+
+<div class="container">
+
+    <div class="card">
+        <h2>Crop</h2>
+        <div id="crop" class="value">Loading...</div>
+    </div>
+
+    <div class="card">
+        <h2>Moisture</h2>
+        <div id="moisture" class="value">0</div>
+    </div>
+
+    <div class="card">
+        <h2>Pump</h2>
+        <div id="pump" class="value">OFF</div>
+    </div>
+
+</div>
+
+<script>
+function fetchData() {
+    fetch('/data')
+    .then(res => res.json())
+    .then(d => {
+        document.getElementById("crop").innerText = d.crop;
+        document.getElementById("moisture").innerText = d.moisture;
+
+        let pumpEl = document.getElementById("pump");
+        pumpEl.innerText = d.pump;
+
+        if (d.pump === "ON") {
+            pumpEl.className = "value on";
+        } else {
+            pumpEl.className = "value off";
+        }
+    });
+}
+
+// Refresh every 2 sec
+setInterval(fetchData, 2000);
+fetchData();
+</script>
+
+</body>
+</html>
+"""
+
+# -------- ROUTES --------
+@app.route("/")
+def home():
+    return render_template_string(HTML)
+
+@app.route("/data")
+def get_data():
+    read_serial()
+    return jsonify(data)
+
+# -------- RUN --------
+if __name__ == "__main__":
+    app.run(debug=True)
