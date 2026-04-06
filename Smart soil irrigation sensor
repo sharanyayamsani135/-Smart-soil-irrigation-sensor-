@@ -1,10 +1,4 @@
-OUTPUT:-
-🌾 Smart Irrigation 
-Dashboard
-
-[ Crop        ]   🌾 Paddy
-[ Moisture    ]   650
-[ Pump        ]   ON (green)# -Smart-soil-irrigation-sensor-
+# -Smart-soil-irrigation-sensor-
 This code tells us about saving of water and ts for agriculture purpose and it'll be useful for farmers
 from flask import Flask, jsonify, render_template_string
 import time
